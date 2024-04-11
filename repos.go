@@ -53,7 +53,10 @@ func SaveRepositories(repos []Repository) error {
 	}
 	defer file.Close()
 
-	if err := json.NewEncoder(file).Encode(repos); err != nil {
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+
+	if err := encoder.Encode(repos); err != nil {
 		return err
 	}
 
