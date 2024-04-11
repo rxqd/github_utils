@@ -25,12 +25,7 @@ const (
 )
 
 func (v *Repository) String() string {
-	var fork string
-	if v.IsFork {
-		fork = "fork"
-	}
-
-	return fmt.Sprintf("[%s]:%s - %s", v.FullName, fork, v.Description)
+	return fmt.Sprintf("[%s] - %s", v.FullName, v.Description)
 }
 
 func FetchAndSaveRepositories() {
@@ -70,7 +65,7 @@ func FetchRepositories() ([]Repository, error) {
 	page := 1
 
 	for {
-		repos, err := doFetchRequest(FetchReposURL, page)
+		repos, err := doFetchRequest(fmt.Sprintf(FetchReposURL, config.UserName), page)
 		if err != nil {
 			return nil, err
 		}
@@ -79,11 +74,25 @@ func FetchRepositories() ([]Repository, error) {
 			break
 		}
 
-		repositories = append(repositories, repos...)
+		repositories = append(repositories, onlyForks(repos)...)
 		page++
 	}
 
 	return repositories, nil
+}
+
+func onlyForks(repos []Repository) []Repository {
+	var forks []Repository
+
+	for _, repo := range repos {
+		if !repo.IsFork {
+			continue
+		}
+
+		forks = append(forks, repo)
+	}
+
+	return forks
 }
 
 func newClient() *http.Client {

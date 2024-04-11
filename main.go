@@ -58,7 +58,7 @@ func main() {
 
 	switch os.Args[1] {
 	case "fetch":
-		fmt.Println("Fetching repositories from github...")
+		FetchAndSaveRepositories()
 	case "list":
 		repos, err := listRepositories()
 		if err != nil {
