@@ -4,7 +4,7 @@
 
 I've checked my Github repository recently and found a lot of useless repositories(forks).
 
-I've found this repo (yangshun/delete-github-forks)[https://github.com/yangshun/delete-github-forks]
+I've found this repo [yangshun/delete-github-forks](https://github.com/yangshun/delete-github-forks)
 But this is `javascript(node)`.
 
 I've thought if I do this other way with `golang`?
@@ -13,17 +13,17 @@ So this is!
 ## Usage
 
 ```
-const usageMessage = `
 Usage: github_utils <subcommand> [options]
 
 Available Subcommands:
   fetch    Fetches repositories from GitHub and saves to file
   list     Lists repositories from file
   remove   Removes repositories (interactive with confirmation)
-`
 
-const removeCmdUsageMessage = `
-Usage: github_utils remove <subcommand>
+
+Remove command usage:
+
+github_utils remove <subcommand>
 
 Available Subcommands:
   all      Removes all repositories with confirmation
