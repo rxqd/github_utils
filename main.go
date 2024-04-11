@@ -3,129 +3,98 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
-	"time"
 )
 
 const (
-	APIVersion = "2022-11-28"
-	configFile = "config.json"
-	linksFile  = "links.json"
-	URL        = "https://api.github.com/users/%s/repos"
+	APIVersion    = "2022-11-28"
+	configFile    = "config.json"
+	linksFile     = "links.json"
+	RootURL       = "https://api.github.com"
+	FetchReposURL = "/users/%s/repos"
+	DeleteRepoURL = "/repos/%s"
 )
 
 type Config struct {
-	URL         string
 	AccessToken string `json:"access_token"`
 	UserName    string `json:"github_username"`
 }
 
-type Repository struct {
-	Name        string `json:"name"`
-	FullName    string `json:"full_name"`
-	Description string `json:"description"`
-	URL         string `json:"html_url"`
-	IsPrivate   bool   `json:"private"`
-	IsFork      bool   `json:"fork"`
-}
-
 var config Config
 
+const usageMessage = `
+Usage: github_utils <subcommand> [options]
+
+Available Subcommands:
+  fetch    Fetches repositories from GitHub and saves to file
+  list     Lists repositories from file
+  remove   Removes repositories (interactive with confirmation)
+`
+
+const removeCmdUsageMessage = `
+Usage: github_utils remove <subcommand>
+
+Available Subcommands:
+  all      Removes all repositories with confirmation
+  					[You can manually remove single repo from json file]
+  check    Asks confirmation for each single repository
+  					y 	remove
+  					n 	skip
+  					q 	quit WITHOUT ANY REMOVE
+  					s 	Skip ALL NEXT
+`
+
 func main() {
-	err := InitConfig()
+	err := initConfig()
 	if err != nil {
-		printError("Error in reading config", err)
+		printError("Error on reading config", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Choose your action")
-}
-
-func FetchAndSaveRepositories() {
-	repos, err := FetchRepositories()
-	if err != nil {
-		printError("Error on fetching repos", err)
-		os.Exit(1)
+	if len(os.Args) < 2 || os.Args[1] == "-h" || os.Args[1] == "--help" {
+		fmt.Print(usageMessage)
+		os.Exit(0)
 	}
 
-	fmt.Println(format(GREEN, "Repositories are fetched successfully"))
-
-	err = SaveRepositories(repos)
-	if err != nil {
-		printError("Error on saving repos", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(format(GREEN, "Repositories are saved successfully"))
-}
-
-func SaveRepositories(repos []Repository) error {
-	file, err := os.Create(linksFile)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	err = encoder.Encode(repos)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func FetchRepositories() ([]Repository, error) {
-	var repositories []Repository
-	page := 1
-
-	for {
-		repos, err := doRequest(config.URL, page)
+	switch os.Args[1] {
+	case "fetch":
+		fmt.Println("Fetching repositories from github...")
+	case "list":
+		repos, err := listRepositories()
 		if err != nil {
-			return nil, err
+			printError("Can't list repositories", err)
 		}
 
-		if len(repos) == 0 {
-			break
+		for _, repo := range repos {
+			fmt.Printf("%s\n", repo.String())
+		}
+	case "remove":
+		if len(os.Args) < 3 {
+			fmt.Print(removeCmdUsageMessage)
+			os.Exit(0)
 		}
 
-		repositories = append(repositories, repos...)
-		page++
-	}
+		repos, err := listRepositories()
+		if err != nil {
+			printError("Can't list repositories", err)
+		}
 
-	return repositories, nil
+		switch os.Args[2] {
+		case "all":
+			removeCmdAll(repos)
+		case "check":
+			removeWithCheck(repos)
+		default:
+			fmt.Print(removeCmdUsageMessage)
+			os.Exit(0)
+		}
+
+	default:
+		fmt.Print(usageMessage)
+	}
 }
 
-func doRequest(url string, page int) ([]Repository, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error on creating request: %w", err)
-	}
-
-	req.Header.Set("X-GitHub-Api-Version", APIVersion)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", config.UserName)
-	req.Header.Set("Authorization", fmt.Sprintf("token %s", config.AccessToken))
-
-	q := req.URL.Query()
-	q.Add("page", fmt.Sprintf("%d", page))
-	req.URL.RawQuery = q.Encode()
-
-	response, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error on making request: %w", err)
-	}
-	defer response.Body.Close()
-
-	var repos []Repository
-	err = json.NewDecoder(response.Body).Decode(&repos)
-
-	return repos, nil
-}
-
-func InitConfig() error {
+func initConfig() error {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return fmt.Errorf("please create \"%s\" from \"%s.tpl\"", configFile, configFile)
@@ -136,35 +105,5 @@ func InitConfig() error {
 		return err
 	}
 
-	config.URL = fmt.Sprintf(URL, config.UserName)
-
 	return nil
-}
-
-func printError(text string, err error) {
-	fmt.Fprintf(os.Stderr, format(RED, "%s: %s\n"), text, err)
-}
-
-const (
-	NONE = iota
-	RED
-	GREEN
-	YELLOW
-	BLUE
-	PURPLE
-)
-
-func format(c int, text any) string {
-	const escape = "\x1b"
-
-	color := func(c int) string {
-		var term string
-		if c != NONE {
-			term = "3"
-		}
-
-		return fmt.Sprintf("%s[%s%dm", escape, term, c)
-	}
-
-	return fmt.Sprintf("%s%s%s", color(c), text, color(NONE))
 }
